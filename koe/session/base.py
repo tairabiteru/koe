@@ -1,12 +1,14 @@
 from __future__ import annotations
 from collections.abc import Callable
 import hikari
+import time
 import typing
 
 from ..utils import AsyncConditionalLock, ensure_one_of
 from ..impl.constructs.track import Track
 from ..impl.constructs.player import PlayerState
 from ..impl.constructs.queue import Queue
+from ..impl.constructs.history import HistoryRecord
 from ..events.player import PlayerUpdateEvent
 from ..events.track import TrackStartEvent, TrackEndEvent
 from ..errors import UninitializedSessionError, NoSessionError, ExistingSessionError
@@ -32,6 +34,7 @@ class Session:
         self._voice_id: hikari.Snowflake | None = None
         self._channel_id: hikari.Snowflake | None = None
         self._id: str | None = None
+        self._history: list[HistoryRecord] = []
         
         self.lock = AsyncConditionalLock()
         self.queue = Queue()
@@ -73,6 +76,12 @@ class Session:
     @property
     def exists(self) -> bool:
         return self._connected
+    
+    async def add_history(self, actor_id: int | None, action: str, unsafe: bool=False) -> None:
+        async with self.lock(unsafe=unsafe):
+            self._history.append(
+                HistoryRecord(time.time(), actor_id, action)
+            )
 
     async def on_voice_state_update(self, event: hikari.VoiceStateUpdateEvent) -> None:
         # If the user is not the bot, we don't care.
@@ -167,7 +176,8 @@ class Session:
         self,
         guild_id: hikari.Snowflake,
         voice_id: hikari.Snowflake,
-        channel_id: hikari.Snowflake | None = None
+        channel_id: hikari.Snowflake | None = None,
+        user_id: hikari.Snowflake | None = None
     ) -> None:
         async with self.lock:
             try:
@@ -179,6 +189,7 @@ class Session:
                 await self.koe.update_player(guild_id)
                 await self.bot.update_voice_state(guild_id, voice_id)
                 self.subscribe()
+                await self.add_history(user_id, "connect", unsafe=True)
             except ExistingSessionError:
                 self._connected = False
                 self._guild_id = None
@@ -186,7 +197,7 @@ class Session:
                 self._channel_id = None
                 raise
     
-    async def disconnect(self) -> None:
+    async def disconnect(self, user_id: hikari.Snowflake | None=None) -> None:
         async with self.lock:
             self._connected = False
             await self.koe.delete_player(self.guild_id)
@@ -198,6 +209,7 @@ class Session:
                 pass
             
             self.unsubscribe()
+            await self.add_history(user_id, "disconnect", unsafe=True)
     
     @require_connected
     async def _set_volume(self, level: int) -> None:
@@ -210,20 +222,22 @@ class Session:
         )
         self._volume = level
     
-    async def set_volume(self, level: int, unsafe: bool=False) -> None:
+    async def set_volume(self, level: int, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
         async with self.lock(unsafe=unsafe):
             self._volume = level
             await self._set_volume(self._volume)
+            await self.add_history(user_id, f"set volume={level}", unsafe=True)
     
-    async def incr_volume(self, level: int, unsafe: bool=False) -> None:
+    async def incr_volume(self, level: int, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
         async with self.lock(unsafe=unsafe):
             if self._volume is None:
                 raise RuntimeError("Volume is null.")
             level = self._volume + level
             await self._set_volume(level)
+            await self.add_history(user_id, f"incr volume={level}", unsafe=True)
     
     @require_connected
-    async def stop(self, unsafe: bool=False) -> None:
+    async def stop(self, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
         async with self.lock(unsafe=unsafe):
             await self.koe.update_player(
                 self.guild_id,
@@ -234,21 +248,24 @@ class Session:
                     }
                 }
             )
+            await self.add_history(user_id, f"stop", unsafe=True)
     
     @require_connected
-    async def skip(self, to: int | None=None, by: int | None=None, unsafe: bool=False) -> None:
+    async def skip(self, to: int | None=None, by: int | None=None, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
         ensure_one_of(to=to, by=by)
         async with self.lock(unsafe=unsafe):
             if to is not None:
                 track = await self.queue.advance_to(to)
+                await self.add_history(user_id, f"skip to={to}", unsafe=True)
             else:
                 assert by is not None
                 track = await self.queue.advance_by(by)
+                await self.add_history(user_id, f"skip by={by}", unsafe=True)
             
             await self.play(track, replace=True, unsafe=True)
     
     @require_connected
-    async def play(self, track: Track, replace: bool=True, unsafe: bool=False) -> None:
+    async def play(self, track: Track, replace: bool=True, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
         async with self.lock(unsafe=unsafe):
             await self.koe.update_player(
                 self.guild_id,
@@ -259,9 +276,10 @@ class Session:
                     }
                 }
             )
+            await self.add_history(user_id, f"play track={track.info.title}", unsafe=True)
     
     @require_connected
-    async def seek(self, hours: int=0, minutes: int=0, seconds: int=0, millis: int=0, unsafe: bool=False) -> None:
+    async def seek(self, hours: int=0, minutes: int=0, seconds: int=0, millis: int=0, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
         async with self.lock(unsafe=unsafe):
             pos = (hours * 3600) * 1000
             pos += (minutes * 60) * 1000
@@ -279,9 +297,10 @@ class Session:
                     'position': millis
                 }
             )
+            await self.add_history(user_id, f"seek pos={millis}", unsafe=True)
     
     @require_connected
-    async def set_pause(self, state: bool, unsafe: bool=False) -> bool:
+    async def set_pause(self, state: bool, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> bool:
         async with self.lock(unsafe=unsafe):
             if self._paused == state:
                 return False
@@ -294,15 +313,16 @@ class Session:
                 }
             )
             self._paused = state
+            await self.add_history(user_id, f"pause set={self._paused}", unsafe=True)
             return True
     
     @require_connected
-    async def toggle_pause(self, unsafe: bool=False) -> None:
+    async def toggle_pause(self, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
         async with self.lock(unsafe=unsafe):
-            await self.set_pause(not self._paused, unsafe=True)
+            await self.set_pause(not self._paused, user_id=user_id, unsafe=True)
     
     @require_connected
-    async def enqueue(self, track: Track, begin_playback: bool=True):
+    async def enqueue(self, track: Track, user_id: hikari.Snowflake | None=None, begin_playback: bool=True):
         async with self.lock:
             await self.queue.append(track)
             
@@ -314,3 +334,5 @@ class Session:
                     
                 assert next_track is not None
                 await self.play(next_track, unsafe=True)
+            
+            await self.add_history(user_id, f"enqueue track={track.info.title}", unsafe=True)

@@ -2,7 +2,7 @@ from .client import Koe
 from .session.base import Session
 from .const import __author__, __version__
 from .events import KoeEvent, LavalinkReadyEvent, PlayerUpdateEvent, StatisticsEvent, TrackEvent, TrackStartEvent, TrackEndEvent, TrackExceptionEvent, WebSocketClosedEvent, WebSocketRecvEvent
-from .impl.constructs import Player, PlayerState, VoiceState, Queue, Memory, CPU, FrameStats, Track, TrackInfo
+from .impl.constructs import Player, PlayerState, VoiceState, Queue, Memory, CPU, FrameStats, Track, TrackInfo, HistoryRecord
 
 from . import impl
 from . import errors
@@ -14,6 +14,7 @@ __all__ = [
     "__version__",
     "CPU",
     "FrameStats",
+    "HistoryRecord",
     "Koe",
     "KoeEvent",
     "LavalinkReadyEvent",
