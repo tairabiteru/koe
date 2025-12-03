@@ -269,7 +269,7 @@ class Session:
             await self.play(track, replace=True, unsafe=True)
     
     @require_connected
-    async def play(self, track: Track, replace: bool=True, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
+    async def play(self, track: Track, replace: bool=True, unsafe: bool=False) -> None:
         async with self.lock(unsafe=unsafe):
             await self.koe.update_player(
                 self.guild_id,
@@ -280,7 +280,6 @@ class Session:
                     }
                 }
             )
-            await self.add_history(user_id, f"play track={track.info.title}", unsafe=True)
     
     @require_connected
     async def seek(self, hours: int=0, minutes: int=0, seconds: int=0, millis: int=0, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:

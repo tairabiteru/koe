@@ -1,3 +1,6 @@
+# 0.2.2
+- Fix bug in session history.
+
 # 0.2.1
 - Add accessor method for history records, which should have been in the previous version. 🙃
 
