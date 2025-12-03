@@ -82,6 +82,10 @@ class Session:
             self._history.append(
                 HistoryRecord(time.time(), actor_id, action)
             )
+        
+    async def get_history(self, unsafe: bool=False) -> list[HistoryRecord]:
+        async with self.lock(unsafe=unsafe):
+            return self._history
 
     async def on_voice_state_update(self, event: hikari.VoiceStateUpdateEvent) -> None:
         # If the user is not the bot, we don't care.
