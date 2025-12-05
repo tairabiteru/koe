@@ -36,7 +36,7 @@ class Session:
         self._channel_id: hikari.Snowflake | None = None
         self._id: str | None = None
         self._history: list[HistoryRecord] = []
-        self._repeat_mode: RepeatMode = RepeatMode.ALL
+        self._repeat_mode: RepeatMode = RepeatMode.NONE
         
         self.lock = AsyncConditionalLock()
         self.queue = Queue()
