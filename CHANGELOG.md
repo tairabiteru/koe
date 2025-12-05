@@ -1,3 +1,6 @@
+# 0.2.3
+- Add Repeat Mode functionality.
+
 # 0.2.2
 - Fix bug in session history.
 

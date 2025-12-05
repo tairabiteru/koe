@@ -33,6 +33,10 @@ class Queue:
             self._queue = []
             self._pos = 0
     
+    async def get_pos(self, unsafe: bool=False) -> int:
+        async with self.lock(unsafe=unsafe):
+            return self._pos
+    
     async def advance_by(self, by: int, unsafe: bool=False) -> Track:
         async with self.lock(unsafe=unsafe):
             if by == 0:

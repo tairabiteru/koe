@@ -9,6 +9,7 @@ from ..impl.constructs.track import Track
 from ..impl.constructs.player import PlayerState
 from ..impl.constructs.queue import Queue
 from ..impl.constructs.history import HistoryRecord
+from ..impl.constructs.enums import RepeatMode
 from ..events.player import PlayerUpdateEvent
 from ..events.track import TrackStartEvent, TrackEndEvent
 from ..errors import UninitializedSessionError, NoSessionError, ExistingSessionError
@@ -35,6 +36,7 @@ class Session:
         self._channel_id: hikari.Snowflake | None = None
         self._id: str | None = None
         self._history: list[HistoryRecord] = []
+        self._repeat_mode: RepeatMode = RepeatMode.ALL
         
         self.lock = AsyncConditionalLock()
         self.queue = Queue()
@@ -86,6 +88,14 @@ class Session:
     async def get_history(self, unsafe: bool=False) -> list[HistoryRecord]:
         async with self.lock(unsafe=unsafe):
             return self._history
+    
+    async def set_repeat_mode(self, mode: RepeatMode, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
+        async with self.lock(unsafe=unsafe):
+            self._repeat_mode = mode
+    
+    async def get_repeat_mode(self, unsafe: bool=False) -> RepeatMode:
+        async with self.lock(unsafe=unsafe):
+            return self._repeat_mode 
 
     async def on_voice_state_update(self, event: hikari.VoiceStateUpdateEvent) -> None:
         # If the user is not the bot, we don't care.
@@ -135,24 +145,27 @@ class Session:
     async def on_track_end(self, event: TrackEndEvent) -> None:
         async with self.lock:
             self._is_playing = False
-            self._current_track = None
-            self._current_track_pos = None
+            next_track = None
 
-            if event.reason in ['finished', 'loadFailed']:
-                track = await self.queue.advance()
-            elif event.reason == "stopped":
-                return
-            else:
-                track = await self.queue.get_current()
-            
-            if track is None:
-                return
-            
-            try:
-                await self.play(track, replace=False, unsafe=True)
-            except NoSessionError:
-                pass
-    
+            if event.may_start_next is True:
+                if self._repeat_mode is RepeatMode.ONE:
+                    next_track = await self.queue.get_current()
+                else:
+                    next_track = await self.queue.advance()
+                    
+                    if self._repeat_mode is RepeatMode.NONE:
+                        if next_track is None:
+                            return
+                        
+                    if self._repeat_mode is RepeatMode.ALL:
+                        if next_track is None:
+                            next_track = await self.queue.advance_to(1)
+                            self._current_track_pos = 0
+
+                assert next_track is not None
+                self._current_track = next_track
+                await self.play(next_track, replace=False, unsafe=True)
+
     async def on_player_update(self, event: PlayerUpdateEvent) -> None:
         if event.guild_id != self.guild_id:
             return

@@ -52,6 +52,10 @@ class TrackEndEvent(TrackEvent):
     def __init__(self, koe: 'Koe', payload: dict):
         super().__init__(koe, payload)
         self.reason: str = payload['reason']
+    
+    @property
+    def may_start_next(self) -> bool:
+        return self.reason in ['finished', 'loadFailed']
         
 
 class TrackExceptionEvent(TrackEvent):

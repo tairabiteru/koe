@@ -1,4 +1,5 @@
 from .base import Serializable
+from .enums import RepeatMode
 from .player import Player, PlayerState, VoiceState
 from .queue import Queue
 from .stats import Memory, CPU, FrameStats
@@ -14,6 +15,7 @@ __all__ = [
     "Player",
     "PlayerState",
     "Queue",
+    "RepeatMode",
     "Serializable",
     "Track",
     "TrackException",
