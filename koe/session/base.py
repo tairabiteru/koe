@@ -157,7 +157,7 @@ class Session:
                     if self._repeat_mode is RepeatMode.NONE:
                         if next_track is None:
                             if self.session_mode is SessionMode.TRANSIENT:
-                                await self.disconnect()
+                                await self.disconnect(unsafe=True)
                                 await self.koe.delete_player(self.guild_id)
                             return
                         
@@ -198,9 +198,10 @@ class Session:
         guild_id: hikari.Snowflake,
         voice_id: hikari.Snowflake,
         channel_id: hikari.Snowflake | None = None,
-        user_id: hikari.Snowflake | None = None
+        user_id: hikari.Snowflake | None = None,
+        unsafe: bool=False
     ) -> None:
-        async with self.lock:
+        async with self.lock(unsafe=unsafe):
             try:
                 self._connected = True
                 self._guild_id = guild_id
@@ -218,8 +219,8 @@ class Session:
                 self._channel_id = None
                 raise
     
-    async def disconnect(self, user_id: hikari.Snowflake | None=None) -> None:
-        async with self.lock:
+    async def disconnect(self, user_id: hikari.Snowflake | None=None, unsafe: bool=False) -> None:
+        async with self.lock(unsafe=unsafe):
             self._connected = False
             await self.koe.delete_player(self.guild_id)
             await self.bot.update_voice_state(self.guild_id, None)

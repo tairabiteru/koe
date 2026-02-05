@@ -1,4 +1,4 @@
-# 0.3.1
+# 0.3.2
 - Fixed an omission in transient mode disconnects.
 
 # 0.3.0
