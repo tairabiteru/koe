@@ -11,6 +11,7 @@ from .errors import NoSessionError, ExistingSessionError
 from .utils import AsyncConditionalLock, ensure_one_of
 from .impl.constructs.track import Track
 from .impl.constructs.player import Player
+from .impl.constructs.enums import SessionMode
 from .log import logger
 
 
@@ -85,16 +86,16 @@ class Koe:
             
             raise NoSessionError(voice_id=voice_id)
     
-    async def add_session(self, session: 'Session') -> None:
-        async with self._session_lock:
+    async def add_session(self, session: 'Session', unsafe: bool=False) -> None:
+        async with self._session_lock(unsafe=unsafe):
             existing_session = self._sessions.get(session.guild_id, None)
             if existing_session is not None:
                 raise ExistingSessionError(existing_session, session.guild_id, session.voice_id)
             self._sessions[session.guild_id] = session
             logger.info(f"Added session with GID {session.guild_id}")
     
-    async def rm_session(self, guild_id: hikari.Snowflake) -> 'Session':
-        async with self._session_lock:
+    async def rm_session(self, guild_id: hikari.Snowflake, unsafe: bool=False) -> 'Session':
+        async with self._session_lock(unsafe=unsafe):
             session = self._sessions.pop(guild_id, None)
             if session is None:
                 raise NoSessionError(guild_id)
@@ -177,3 +178,44 @@ class Koe:
     
     async def on_lavalink_ready(self, event: LavalinkReadyEvent):
         self._session_id = event.session_id
+        
+    async def stop(self) -> None:
+        async with self._session_lock:
+            for session in self._sessions.values():
+                await session.disconnect()
+                await self.rm_session(session.guild_id, unsafe=True)
+            
+            self._rest = None
+            
+            if self._ws is not None:
+                self._ws.stop()
+                self._ws = None
+    
+    async def serialize_sessions(self) -> dict:
+        async with self._session_lock:
+            out = {}
+            
+            for gid, session in self._sessions.items():
+                if session._connected:
+                    out[int(gid)] = {
+                        'guild_id': int(session.guild_id),
+                        'voice_id': int(session.voice_id),
+                        'channel_id': int(session.channel_id),
+                        'mode': str(session.session_mode)
+                    }
+            return out
+    
+    async def deserialize_sessions(self, session_data: dict) -> None:
+        async with self._session_lock:
+            for sd in session_data.values():
+                session = Session(self)
+                if sd['mode'] == 'TRANSIENT':
+                    session.session_mode = SessionMode.TRANSIENT
+                await session.connect(
+                    sd['guild_id'],
+                    sd['voice_id'],
+                    sd['channel_id']
+                )
+                
+                await self.add_session(session)
+            

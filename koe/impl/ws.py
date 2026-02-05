@@ -35,6 +35,7 @@ class WebSocket(Connection):
         self.password = password
         
         self._connected: bool = False
+        self._task: asyncio.Task | None = None
     
     @property
     def headers(self) -> dict[str, str]:
@@ -86,5 +87,9 @@ class WebSocket(Connection):
         
         loop = asyncio.get_event_loop()
         logger.info(f"Starting websocket connection to {self.route}/v4/websocket")
-        loop.create_task(self._loop(koe))
+        self._task = loop.create_task(self._loop(koe))
+    
+    def stop(self) -> None:
+        if self._task is not None:
+            self._task.cancel()
                 

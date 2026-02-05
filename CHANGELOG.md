@@ -1,3 +1,7 @@
+# 0.4.0
+- Added session serialization/deserialization.
+- Added in the ability to stop Koe.
+
 # 0.3.2
 - Fixed an omission in transient mode disconnects.
 
