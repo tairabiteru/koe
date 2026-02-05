@@ -1,3 +1,6 @@
+# 0.3.1
+- Fixed an omission in transient mode disconnects.
+
 # 0.3.0
 - Add in session modes.
 - Add the ability to clear a queue.

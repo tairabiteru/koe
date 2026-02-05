@@ -157,6 +157,7 @@ class Session:
                     if self._repeat_mode is RepeatMode.NONE:
                         if next_track is None:
                             if self.session_mode is SessionMode.TRANSIENT:
+                                await self.disconnect()
                                 await self.koe.delete_player(self.guild_id)
                             return
                         
