@@ -98,3 +98,8 @@ class Queue:
     async def get_all_and_pos(self, unsafe: bool=False) -> tuple[list[Track], int]:
         async with self.lock(unsafe=unsafe):
             return self._queue, self._pos
+    
+    async def empty(self, unsafe: bool=False) -> None:
+        async with self.lock(unsafe=unsafe):
+            self._queue = []
+            self._pos = 0

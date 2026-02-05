@@ -9,7 +9,7 @@ from ..impl.constructs.track import Track
 from ..impl.constructs.player import PlayerState
 from ..impl.constructs.queue import Queue
 from ..impl.constructs.history import HistoryRecord
-from ..impl.constructs.enums import RepeatMode
+from ..impl.constructs.enums import RepeatMode, SessionMode
 from ..events.player import PlayerUpdateEvent
 from ..events.track import TrackStartEvent, TrackEndEvent
 from ..errors import UninitializedSessionError, NoSessionError, ExistingSessionError
@@ -37,6 +37,7 @@ class Session:
         self._id: str | None = None
         self._history: list[HistoryRecord] = []
         self._repeat_mode: RepeatMode = RepeatMode.NONE
+        self.session_mode: SessionMode = SessionMode.PERSISTENT
         
         self.lock = AsyncConditionalLock()
         self.queue = Queue()
@@ -155,6 +156,8 @@ class Session:
                     
                     if self._repeat_mode is RepeatMode.NONE:
                         if next_track is None:
+                            if self.session_mode is SessionMode.TRANSIENT:
+                                await self.koe.delete_player(self.guild_id)
                             return
                         
                     if self._repeat_mode is RepeatMode.ALL:

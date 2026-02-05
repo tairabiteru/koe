@@ -1,3 +1,10 @@
+# 0.3.0
+- Add in session modes.
+- Add the ability to clear a queue.
+
+# 0.2.4
+- Updated readme.
+
 # 0.2.3
 - Add Repeat Mode functionality.
 
