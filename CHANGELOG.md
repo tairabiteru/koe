@@ -1,3 +1,7 @@
+# 0.5.0
+- Added support for Lavalink 4.2.0+ and DAVE.
+- Added Session.transient_dc_delay to add a shot delay to transient disconnects.
+
 # 0.4.0
 - Added session serialization/deserialization.
 - Added in the ability to stop Koe.

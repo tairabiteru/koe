@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from collections.abc import Callable
 import hikari
 import time
@@ -38,6 +39,7 @@ class Session:
         self._history: list[HistoryRecord] = []
         self._repeat_mode: RepeatMode = RepeatMode.NONE
         self.session_mode: SessionMode = SessionMode.PERSISTENT
+        self.transient_dc_delay: float = 0.5
         
         self.lock = AsyncConditionalLock()
         self.queue = Queue()
@@ -131,7 +133,8 @@ class Session:
                     'voice': {
                         'token': event.token,
                         'sessionId': self._id,
-                        'endpoint': event.endpoint.replace("wss://", "")
+                        'endpoint': event.endpoint.replace("wss://", ""),
+                        'channelId': str(self.voice_id)
                     }
                 }
             )
@@ -157,6 +160,7 @@ class Session:
                     if self._repeat_mode is RepeatMode.NONE:
                         if next_track is None:
                             if self.session_mode is SessionMode.TRANSIENT:
+                                await asyncio.sleep(self.transient_dc_delay)
                                 await self.disconnect(unsafe=True)
                                 await self.koe.delete_player(self.guild_id)
                             return

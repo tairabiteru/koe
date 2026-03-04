@@ -18,6 +18,7 @@ class VoiceState(Serializable):
     token: str
     endpoint: str
     session_id: str
+    channel_id: int | None
 
 
 @dataclass
@@ -34,4 +35,7 @@ class Player(Serializable):
     def construct(cls, data: dict[str, Any]) -> Self:
         # Lavalink transmits guild_id as a str, but no.
         data['guild_id'] = int(data['guild_id'])
+        
+        if data['voice']['channel_id']:
+            data['voice']['channel_id'] = int(data['voice']['channel_id'])
         return super().construct(data)
